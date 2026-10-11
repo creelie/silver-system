@@ -21,6 +21,10 @@ vertices are adjacent in `F`. Then `F[w]` has independence number 2.
   drawing (both layers planar, every edge covered) with NetworkX.
 - `.github/workflows/blowups.yml` runs the 16 shards; `direct.yml` runs symmetric direct searches
   (`encode/direct.py`, `data/direct.txt`). Both are started by hand.
+- `.github/workflows/enum18.yml` enumerates the possible complements H on 18 vertices with nauty's
+  geng and the prune hook `enum/prune.c` (built by `scripts/build_geng.sh`). The hook's last
+  condition uses the theorem that no clique blow-up of the five-cycle with 17 or more vertices and
+  clique number at most 8 is biplanar.
 - `.github/workflows/c5probe.yml` races four solver configurations (`scripts/race.sh`) on the
   five-cycle blow-ups with 17 vertices whose formulas were slow in creelie/probable-fortnight.
 

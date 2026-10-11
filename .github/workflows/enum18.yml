@@ -1,0 +1,40 @@
+name: enum18
+
+# Enumerates the triangle-free graphs H on 18 vertices that could be complements of a biplanar
+# graph with independence number 2 (geng with the PRUNE hook enum/prune.c: maximum degree 8,
+# 57 to 72 edges, hereditary edge and independence bounds, and no homomorphism to C5 of H or of
+# any H - v). One job per sixteenth of the 1000 geng slices.
+
+on:
+  push:
+    branches: ["claude/op2-blowups"]
+    paths: [".github/workflows/enum18.yml", "enum/**", "scripts/build_geng.sh"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  enum:
+    name: Part ${{ matrix.part }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build geng with the prune hook
+        run: scripts/build_geng.sh
+      - name: Enumerate
+        run: |
+          mkdir -p out
+          seq ${{ matrix.part }} 16 999 | xargs -P 4 -I{} sh -c \
+            'build/tools/geng18 -t -D8 -d1 -q 18 57:72 {}/1000 > out/p{}.g6'
+          cat out/p*.g6 | wc -l
+      - name: Keep the graphs
+        uses: actions/upload-artifact@v4
+        with:
+          name: enum18-${{ matrix.part }}
+          path: out/
