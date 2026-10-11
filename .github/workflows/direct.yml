@@ -1,0 +1,41 @@
+name: direct
+
+# Direct searches for biplanar graphs with small independence number under a prescribed symmetry:
+# 18 vertices with independence number 2 (Gethner–Sulanke, Open Problem 2), and 26 or 28 vertices
+# with independence number 3 (26 would answer Open Problem 2, 28 would give chromatic number 10).
+# One job per line of data/direct.txt, four solver configurations per job.
+
+on:
+  push:
+    branches: ["claude/op2-blowups"]
+    paths: ["data/direct.txt", "encode/direct.py", "scripts/direct.sh", ".github/workflows/direct.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  search:
+    name: Line ${{ matrix.line }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        line: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Kissat and CaDiCaL
+        run: |
+          scripts/get_tools.sh
+          pip install -q networkx
+      - name: Search
+        run: scripts/direct.sh ${{ matrix.line }} 20400
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: line-${{ matrix.line }}
+          path: |
+            out/results.txt
+            out/*.g6*
