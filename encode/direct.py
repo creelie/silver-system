@@ -1,10 +1,11 @@
-"""direct.py N OUT.cnf [aA] [disjoint] [sym=CYCLES] [lsym=CYCLES] [lswap=CYCLES] [k9]
+"""direct.py N OUT.cnf [aA] [disjoint] [sym=CYCLES] [lsym=CYCLES] [lswap=CYCLES] [k9] [k5l] [k33l]
 
 CNF for a biplanar graph U on N labelled vertices with independence number at most A (default 2):
 two layers, each planar by Schnyder's theorem (three linear orders), and every (A+1)-set spans an
 edge of U. Options: disjoint (no edge in both layers); sym= (U invariant under the permutation given
 by its cycles, e.g. 0,1,2;3,4,5); lsym= (each layer invariant); lswap= (the permutation maps layer 0
-to layer 1 and back); k9 (no 9-clique, implied but added). OUT.cnf.map lists "layer a b variable".
+to layer 1 and back); k9 (no 9-clique, implied but added); k5l, k33l (no K5, no K3,3 inside one
+layer, implied by planarity). OUT.cnf.map lists "layer a b variable".
 """
 import sys, itertools
 n=int(sys.argv[1]); out=sys.argv[2]
@@ -77,6 +78,17 @@ for t in opts:
             for L in (0,1):
                 M=1-L if sw else L
                 cl.append([-x[L,(a,b)],x[M,q]]); cl.append([x[L,(a,b)],-x[M,q]])
+# planarity of each layer: no K5 and no K3,3 inside one layer (implied by Kuratowski, may help)
+if 'k5l' in opts:
+    for L in (0,1):
+        for S in itertools.combinations(V,5):
+            cl.append([-x[L,p] for p in itertools.combinations(S,2)])
+if 'k33l' in opts:
+    for L in (0,1):
+        for A in itertools.combinations(V,3):
+            rest=[v for v in V if v not in A and v>A[0]]
+            for B in itertools.combinations(rest,3):
+                cl.append([-x[L,P(a,b)] for a in A for b in B])
 # K9-free union (implied, helps)
 if 'k9' in opts:
     for S in itertools.combinations(V,9):

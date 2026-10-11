@@ -6,9 +6,6 @@ name: direct
 # One job per line of data/direct.txt, four solver configurations per job.
 
 on:
-  push:
-    branches: ["claude/op2-blowups"]
-    paths: ["data/direct.txt", "encode/direct.py", "scripts/direct.sh", ".github/workflows/direct.yml"]
   workflow_dispatch:
 
 permissions:

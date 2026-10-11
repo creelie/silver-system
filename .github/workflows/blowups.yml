@@ -4,9 +4,6 @@ name: blowups
 # (Gethner–Sulanke, Open Problem 2). Each of the 16 jobs takes every 16th line of the queue.
 
 on:
-  push:
-    branches: ["claude/op2-blowups"]
-    paths: ["data/**", "scripts/**", "encode/**", ".github/workflows/blowups.yml"]
   workflow_dispatch:
 
 permissions:

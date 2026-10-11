@@ -1,0 +1,48 @@
+name: c5probe
+
+# Races four solver configurations, without proof output, on the clique blow-ups C5[w] with 17
+# vertices whose biplanarity formulas resisted the first certificate runs: is each formula
+# satisfiable or not, and how long does it take?
+
+on:
+  push:
+    branches: ["claude/op2-blowups"]
+    paths: [".github/workflows/c5probe.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: C5[${{ matrix.w }}]
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        w: ["3,3,4,3,4", "2,2,5,3,5", "2,3,4,3,5", "2,3,4,4,4", "2,3,5,3,4", "2,4,3,3,5",
+            "2,4,3,4,4", "3,3,3,4,4"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install elan and the Lean toolchain
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install "$(cat lean-toolchain)"
+      - name: Build Kissat and CaDiCaL
+        run: scripts/get_tools.sh
+      - name: Encode and race
+        run: |
+          mkdir -p out
+          t=$(echo "${{ matrix.w }}" | tr , _)
+          lean --run encode/DumpF.lean "${{ matrix.w }}" 0-1,1-2,2-3,3-4,0-4 "out/c5_$t.cnf"
+          scripts/race.sh "out/c5_$t.cnf" 20400 | tee out/results.txt
+          rm -f out/*.cnf
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: c5probe-${{ matrix.w }}
+          path: out/
