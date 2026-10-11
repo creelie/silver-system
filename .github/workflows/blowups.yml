@@ -1,0 +1,53 @@
+name: blowups
+
+# Tests clique blow-ups F[w] on 18 vertices with independence number 2 for biplanarity
+# (Gethner–Sulanke, Open Problem 2). Each of the 16 jobs takes every 16th line of the queue.
+
+on:
+  push:
+    branches: ["claude/op2-blowups"]
+    paths: ["data/**", "scripts/**", "encode/**", ".github/workflows/blowups.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shard:
+    name: Shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install elan and the Lean toolchain
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+          "$HOME/.elan/bin/elan" toolchain install "$(cat lean-toolchain)"
+      - name: Build Kissat
+        run: scripts/get_tools.sh
+      - name: Test the shard
+        run: timeout 20400 scripts/shard.sh data/queue1.txt ${{ matrix.shard }} 16 1800 4 || true
+      - name: Decode drawings that were found
+        if: always()
+        run: |
+          pip install -q networkx
+          for s in out/*.sol; do
+            [ -e "$s" ] || continue
+            t=$(basename "$s" .sol)
+            line=$(grep "tag=$t " out/results.txt | sed 's/ tag=.*//')
+            echo "FOUND $line"
+            python3 scripts/decode.py "$line" "$s"
+          done
+          grep -h ' rc=' out/results.txt | awk '{print $3}' | sort | uniq -c
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.shard }}
+          path: out/
