@@ -1,27 +1,38 @@
 #!/usr/bin/env bash
-# stabcube.sh "n p s1,..,sp dmin" FLAGS DEPTH CUBE_TIMEOUT BUDGET WORKERS
+# stabcube.sh "n p s1,..,sp dmin" FLAGS DEPTH CUBE_TIMEOUT BUDGET WORKERS [OPTIONS]
 #   Cube and conquer on one Turán-stability model (scripts/stab2.py with the redundant constraints
-#   FLAGS). march_cu splits the formula DEPTH levels deep; Kissat solves each cube (the formula plus
+#   FLAGS). march_cu splits the formula DEPTH levels deep; OPTIONS: "cubes=FILE" starts from the cubes
+#   of FILE instead (one per line, e.g. the open cubes of an earlier run with the same FLAGS), and
+#   "shard=k/N" keeps only the cubes numbered k mod N (from 0). Kissat solves each cube (the formula plus
 #   the cube's literals as unit clauses) within CUBE_TIMEOUT seconds, WORKERS cubes at a time. A cube
 #   that is not decided is split 6 levels further by march_cu (its children keep the parent's
 #   literals) and queued again, until BUDGET seconds have passed.
 #   Output in out/: result.txt ("UNSAT", "SAT" with the decoded graph, or "OPEN k"), cubes.txt (every
 #   cube with its result), open.txt (cubes left), model files for a SAT cube.
 set -uo pipefail
-read -r n p sz dm <<< "$1"; FL=$2; D=$3; CT=$4; BUDGET=$5; W=$6
+read -r n p sz dm <<< "$1"; FL=$2; D=$3; CT=$4; BUDGET=$5; W=$6; CUBES=; SHARD=
+for o in "${@:7}"; do case "$o" in cubes=*) CUBES=$(realpath "${o#cubes=}") ;; shard=*) SHARD=${o#shard=} ;; esac; done
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 K="$ROOT/build/tools/kissat/build/kissat"; M="$ROOT/build/CnC/march_cu/march_cu"
 O="$ROOT/out"; mkdir -p "$O"; T0=$(date +%s)
 python3 "$ROOT/scripts/stab2.py" "$n" "$p" "$sz" "$O/m.cnf" "$dm" - "$FL"
-"$M" "$O/m.cnf" -d "$D" -o "$O/q.icnf" > "$O/march0.log" 2>&1; mrc=$?
-if grep -q 'UNSATISFIABLE' "$O/march0.log"; then
-  echo "$1 UNSAT (march_cu at the root) $(( $(date +%s) - T0 ))s" | tee "$O/result.txt"; exit 0
+if [ -n "$CUBES" ]; then
+  grep -v '^ *$' "$CUBES" > "$O/queue.txt"; echo "$(wc -l < "$O/queue.txt") cubes from $CUBES" | tee "$O/march0.txt"
+else
+  "$M" "$O/m.cnf" -d "$D" -o "$O/q.icnf" > "$O/march0.log" 2>&1; mrc=$?
+  if grep -q 'UNSATISFIABLE' "$O/march0.log"; then
+    echo "$1 UNSAT (march_cu at the root) $(( $(date +%s) - T0 ))s" | tee "$O/result.txt"; exit 0
+  fi
+  if [ "$mrc" != 0 ] || ! grep -q '^a' "$O/q.icnf" 2>/dev/null; then
+    echo "$1 ERROR march_cu exit $mrc" | tee "$O/result.txt"; tail -5 "$O/march0.log"; exit 1
+  fi
+  grep '^a' "$O/q.icnf" | sed -E 's/^a//; s/(^| )0$//; s/^ //' > "$O/queue.txt"
+  grep -o 'number of cubes [0-9]*, including [0-9]* refuted leaves' "$O/march0.log" | tee "$O/march0.txt"
 fi
-if [ "$mrc" != 0 ] || ! grep -q '^a' "$O/q.icnf" 2>/dev/null; then
-  echo "$1 ERROR march_cu exit $mrc" | tee "$O/result.txt"; tail -5 "$O/march0.log"; exit 1
+if [ -n "$SHARD" ]; then
+  awk -v k="${SHARD%/*}" -v m="${SHARD#*/}" '(NR - 1) % m == k' "$O/queue.txt" > "$O/q1.txt"; mv "$O/q1.txt" "$O/queue.txt"
+  echo "shard $SHARD: $(wc -l < "$O/queue.txt") cubes" | tee -a "$O/march0.txt"
 fi
-grep '^a' "$O/q.icnf" | sed -E 's/^a//; s/(^| )0$//; s/^ //' > "$O/queue.txt"
-grep -o 'number of cubes [0-9]*, including [0-9]* refuted leaves' "$O/march0.log" | tee "$O/march0.txt"
 : > "$O/cubes.txt"
 solve() {  # solve WORKER QUEUEFILE
   local j=$1 q=$2 cube rc s

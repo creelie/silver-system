@@ -1,7 +1,7 @@
 name: stabcube
 
 # Cube and conquer on the Turán-stability models (scripts/stabcube.sh): one line
-# "n p s1,..,sp dmin" of the queue per job, four workers per job. A push that changes
+# "n p s1,..,sp dmin [cubes=FILE] [shard=k/N]" of the queue per job, four workers per job. A push that changes
 # data/stabcube.env starts a run on the queue, flags, depth and time limits written there.
 
 on:
@@ -47,10 +47,10 @@ jobs:
       - name: Cube and conquer
         run: |
           . data/stabcube.env
-          line=$(sed -n "$(( ${{ matrix.part }} + 1 ))p" "$QUEUE")
-          echo "$line"
+          read -r n p s d opts <<< "$(sed -n "$(( ${{ matrix.part }} + 1 ))p" "$QUEUE")"
+          echo "$n $p $s $d ${opts:-}"
           ulimit -s unlimited
-          timeout 335m scripts/stabcube.sh "$line" "$FLAGS" "$DEPTH" "$CUBE_TIMEOUT" "$BUDGET" "$(nproc)" || true
+          timeout 335m scripts/stabcube.sh "$n $p $s $d" "$FLAGS" "$DEPTH" "$CUBE_TIMEOUT" "$BUDGET" "$(nproc)" ${opts:-} || true
       - name: Keep the result
         if: always()
         uses: actions/upload-artifact@v4
