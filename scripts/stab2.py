@@ -116,6 +116,20 @@ for Q in (P if 'n' not in EXTRA else []):
             prev = eq
 if (0, 1) in pairs and part[0] == part[1]:
     cls.append([-E(0, 1), L(0, 0, 1)])
+if 's' in EXTRA:  # parts X, Y of equal size: U <=lex sigma(U), sigma swapping X[i] and Y[i] (pairs in order)
+    for xi, yi in itertools.combinations(range(p), 2):
+        if sizes[xi] != sizes[yi]: continue
+        sig = list(range(n))
+        for a, b in zip(P[xi], P[yi]): sig[a], sig[b] = b, a
+        prev = None
+        for r, c in pairs:
+            a, b = E(r, c), E(sig[r], sig[c])
+            if a == b: continue
+            cls.append(([-prev] if prev else []) + [-a, b])
+            eq = pool.id(('seq', xi, yi, r, c))
+            cls.append(([-prev] if prev else []) + [a, b, eq])
+            cls.append(([-prev] if prev else []) + [-a, -b, eq])
+            prev = eq
 
 # ---- redundant constraints (all implied by layer planarity) ----
 if 'a' in EXTRA:  # Euler on P + v in each layer

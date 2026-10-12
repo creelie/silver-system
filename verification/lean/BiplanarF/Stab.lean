@@ -12,8 +12,9 @@ and whose complement `H` is split into the parts `P₀, P₁, …` (consecutive 
 by a partition that minimises the number of edges of `H` inside the parts. It is the formula written by
 `scripts/stab2.py n p sizes out dmin - flags`, clause for clause and variable for variable (the
 cardinality constraints are PySAT's sequential counter and totalizers), with the redundant
-constraints named by `flags` (letters `a b d e p r`, `n` to leave out the symmetry breaking and `k` to
-leave out the clauses of item 5 on 9 vertices of a part).
+constraints named by `flags` (letters `a b d e p r`, `n` to leave out the symmetry breaking inside the
+parts, `s` to break the symmetry between parts of equal size and `k` to leave out the clauses of item 5
+on 9 vertices of a part).
 
 Literals are written as signed DIMACS numbers (`Int`, variables counted from 1) and stored as
 `cubeLit x = (|x| - 1, x > 0)`, so `Std.Sat.CNF.dimacs` prints them back unchanged. With `N = n(n-1)/2`
@@ -35,7 +36,9 @@ Clauses (in this order):
 7. local optimality: moving a vertex to another part does not lower the number of edges of `H`
    inside the parts; every vertex has degree at least `dmin` in `U`;
 8. symmetry breaking: inside a part, the rows of the adjacency matrix of `U` (columns other than the
-   two rows) increase lexicographically; if `01` is an edge of `U`, it lies in `T₀`;
+   two rows) increase lexicographically; if `01` is an edge of `U`, it lies in `T₀`; with flag `s`, for
+   two parts of equal size, `U` is lexicographically at most its image under the permutation that
+   swaps their `i`-th vertices (the pairs `a < b` in order);
 9. redundant consequences of planarity (flags): `a` Euler on a part plus one vertex; `b` Euler on the
    union of two parts; `d` every vertex has degree at least 3 in `T_l`; `e` every edge of `T_l` lies in
    two triangles of `T_l`; `p` port bounds: if `T_l[Q]` has at least `K(|Q|)` edges it is connected
@@ -289,6 +292,25 @@ def encodeSt (n p : Nat) (sizes : List Nat) (dmin : Nat) (flags : String) : St :
               emit (pre ++ [-a, -b, eq])
               prev := some eq
     if n ≥ 2 && part[0]! == part[1]! then emit [-E 0 1, L 0 0 1]
+    if has 's' then
+      for (xi, yi) in pairsOf (List.range P.size) do
+        if P[xi]!.size == P[yi]!.size then
+          let mut sig : Array Nat := Array.range n
+          for k in [0:P[xi]!.size] do
+            let a := P[xi]![k]!
+            let b := P[yi]![k]!
+            sig := (sig.set! a b).set! b a
+          let mut prev : Option Int := none
+          for (r, c) in prs do
+            let a := E r c
+            let b := E sig[r]! sig[c]!
+            if a != b then
+              let pre : List Int := match prev with | some e => [-e] | none => []
+              emit (pre ++ [-a, b])
+              let eq ← newVar
+              emit (pre ++ [a, b, eq])
+              emit (pre ++ [-a, -b, eq])
+              prev := some eq
     -- 9. redundant consequences of planarity
     if has 'a' then
       for l in [0:2] do
