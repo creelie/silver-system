@@ -46,7 +46,9 @@ while [ -s "$O/queue.txt" ]; do
   [ -s "$O/open.txt" ] || break
   [ $(( $(date +%s) - T0 )) -lt "$BUDGET" ] || break
   while IFS= read -r cube; do
-    "$M" <(cat "$O/m.cnf"; for l in $cube; do echo "$l 0"; done) -d 6 -o "$O/sub.icnf" > "$O/sub.log" 2>&1 || true
+    # march_cu reads only as many clauses as the header declares, so the header must count the units
+    "$M" <(awk -v k="$(wc -w <<< "$cube")" 'NR == 1 { $4 += k } { print }' "$O/m.cnf"; for l in $cube; do echo "$l 0"; done) \
+      -d 6 -o "$O/sub.icnf" > "$O/sub.log" 2>&1 || true
     if grep -q '^a' "$O/sub.icnf" 2>/dev/null; then
       grep '^a' "$O/sub.icnf" | sed 's/^a //; s/ 0$//' | sed "s/^/$cube /" >> "$O/queue.txt"
     elif grep -q 'UNSATISFIABLE' "$O/sub.log"; then echo "$round 20 0 $cube (march)" >> "$O/cubes.txt"
