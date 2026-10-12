@@ -3,4 +3,4 @@ out/
 verification/lean/.lake/
 verification/lean/Certs/
 verification/lean/StabCert/
-scripts/.stabcert_run*.sh
+scripts/.stab*_run*.sh

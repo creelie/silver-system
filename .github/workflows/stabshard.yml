@@ -1,0 +1,79 @@
+name: stabshard
+
+# Lean-checked cube and conquer on the Turán-stability models, one case spread over many jobs
+# (scripts/stabshard.sh). A push that changes data/stabshard.env starts a run on the queue written
+# there: one line "n p s1,..,sp dmin CUBES N GEN" per case, run as N jobs (shard k of the cubes of the
+# file CUBES, Lean modules StabCert.<case>.g<GEN>s<k>). Each job keeps its checked cubes, the cubes
+# left open (the CUBES of a later generation) and the public part of its Lean modules;
+# stabfinal.yml combines the shards into the theorem for the case.
+
+on:
+  push:
+    paths: ["data/stabshard.env"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      jobs: ${{ steps.p.outputs.jobs }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: p
+        run: |
+          . data/stabshard.env
+          echo "jobs=$(awk 'NF { for (k = 0; k < $6; k++) printf "%s{\"l\":%d,\"k\":%d}", (c++ ? "," : "["), NR - 1, k } END { print "]" }' "$QUEUE")" >> "$GITHUB_OUTPUT"
+  shard:
+    needs: plan
+    name: Line ${{ matrix.j.l }} shard ${{ matrix.j.k }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        j: ${{ fromJSON(needs.plan.outputs.jobs) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space for the proofs
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build CaDiCaL, lrat-trim, march_cu and the Lean encoder
+        run: |
+          scripts/get_tools.sh
+          pip install -q python-sat networkx
+          git clone -q https://github.com/marijnheule/CnC.git build/CnC
+          git -C build/CnC checkout -q 705b60c6491ef2b61988b3ce6ac674be1b90571d
+          sed -i "s/S->mem_max     = 10000000;/S->mem_max     = 300000000;/" build/CnC/march_cu/microsat.c
+          make -C build/CnC/march_cu CFLAGS="-O3 -fno-strict-aliasing -Wall -DNDEBUG -fcommon" > /dev/null
+          cd verification/lean && lake build > /dev/null && lake build stab-dump > /dev/null
+      - name: Refute the shard's cubes and check them in Lean
+        run: |
+          . data/stabshard.env
+          read -r n p s d cubes nsh gen <<< "$(sed -n "$(( ${{ matrix.j.l }} + 1 ))p" "$QUEUE")"
+          k=${{ matrix.j.k }}; tag="g${gen}s$k"
+          echo "$n $p $s $d $cubes shard $k/$nsh $tag"
+          ulimit -s unlimited
+          export CHUNK_MB
+          timeout 340m scripts/stabshard.sh "$n $p $s $d" "$FLAGS" "$cubes" "$k/$nsh" "$tag" "$CUBE_TIMEOUT" "$BUDGET" "$(( $(nproc) - 1 ))" "$SPLIT" || true
+          ns="T${n}_${p}_${s//,/_}_d${d}_${FLAGS}"
+          o=build/stabshard/$ns/$tag; lib=verification/lean/.lake/build/lib/lean/StabCert/$ns/$tag
+          mkdir -p "out/lean/$tag" "out/olean/$tag"
+          cp "$o"/result.txt "$o"/leaves.txt "$o"/open.txt "$o"/chunks.txt "$o"/cubes.txt "$o"/lean.txt "$o"/lrat.sha256 "$o"/SAT_* out/ 2>/dev/null || true
+          cp verification/lean/StabCert/$ns/$tag/*.lean "out/lean/$tag/" 2>/dev/null || true
+          (cd "$lib" 2>/dev/null && cp *.olean *.olean.server *.ir *.ir.sig *.ilean "$GITHUB_WORKSPACE/out/olean/$tag/") || true
+          cat out/result.txt || true
+      - name: Keep the checked cubes and the public Lean modules
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stabshard-${{ matrix.j.l }}-${{ matrix.j.k }}
+          path: out/

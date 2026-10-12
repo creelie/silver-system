@@ -1,0 +1,54 @@
+name: stabfinal
+
+# The theorem (Stab.encode n p sizes dmin flags).Unsat for one case from the shards of stabshard runs
+# (scripts/stabfinal.sh). A push that changes data/stabfinal.env starts it: CASE ("n p s1,..,sp
+# dmin"), FLAGS and SOURCES, a list of "RUN:LINE" (the stabshard run and its queue line for this case,
+# one per generation of shards).
+
+on:
+  push:
+    paths: ["data/stabfinal.env"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  final:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build CaDiCaL, lrat-trim and the Lean encoder
+        run: |
+          scripts/get_tools.sh
+          cd verification/lean && lake build > /dev/null && lake build stab-dump > /dev/null
+      - name: Fetch the shards
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          . data/stabfinal.env
+          for s in $SOURCES; do
+            gh run download "${s%%:*}" -R "$GITHUB_REPOSITORY" -p "stabshard-${s#*:}-*" -D "shards/${s%%:*}"
+          done
+          ls shards/*/
+      - name: Combine and check in Lean
+        run: |
+          . data/stabfinal.env
+          ulimit -s unlimited
+          scripts/stabfinal.sh "$CASE" "$FLAGS" shards/*/stabshard-* || true
+          mkdir -p out; cp build/stabfinal/*/result.txt build/stabfinal/*/lean.txt out/ 2>/dev/null || true
+          cp verification/lean/StabCert/*/Final.lean out/ 2>/dev/null || true
+          cat out/result.txt || true
+      - name: Keep the result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stabfinal
+          path: out/
