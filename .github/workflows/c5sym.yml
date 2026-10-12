@@ -1,0 +1,42 @@
+name: c5sym
+
+# Searches for biplanar drawings of the slow five-cycle blow-ups C5[w] (17 vertices) whose second
+# layer is the image of the first under an automorphism sigma (data/c5sym.txt: w, name, sigma).
+# One planar layer is encoded (encode/symlay.py); a model is a biplanar drawing.
+
+on:
+  push:
+    branches: ["claude/op2-blowups"]
+    paths: [".github/workflows/c5sym.yml", "data/c5sym.txt", "encode/symlay.py"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sym:
+    name: Line ${{ matrix.line }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        line: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Kissat and CaDiCaL
+        run: scripts/get_tools.sh
+      - name: Encode and race
+        run: |
+          mkdir -p out
+          read -r w name sigma < <(sed -n "${{ matrix.line }}p" data/c5sym.txt)
+          python3 encode/symlay.py "$w" "$sigma" "out/$name.cnf" k5k33
+          echo "C5[$w] sigma $name"
+          scripts/race.sh "out/$name.cnf" 20400 | tee out/results.txt
+          rm -f out/*.cnf
+      - name: Keep the results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: c5sym-${{ matrix.line }}
+          path: out/
