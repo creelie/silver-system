@@ -1,0 +1,64 @@
+name: stabcube
+
+# Cube and conquer on the Turán-stability models (scripts/stabcube.sh): one line
+# "n p s1,..,sp dmin" of the queue per job, four workers per job. A push that changes
+# data/stabcube.env starts a run on the queue, flags, depth and time limits written there.
+
+on:
+  push:
+    paths: ["data/stabcube.env"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      parts: ${{ steps.p.outputs.parts }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: p
+        run: |
+          . data/stabcube.env
+          echo "parts=$(seq -s, 0 $(( $(grep -c . "$QUEUE") - 1 )) | sed 's/^/[/; s/$/]/')" >> "$GITHUB_OUTPUT"
+  solve:
+    needs: plan
+    name: Line ${{ matrix.part }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJSON(needs.plan.outputs.parts) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Kissat and march_cu
+        run: |
+          scripts/get_tools.sh
+          pip install -q python-sat networkx
+          git clone -q https://github.com/marijnheule/CnC.git build/CnC
+          git -C build/CnC checkout -q 705b60c6491ef2b61988b3ce6ac674be1b90571d
+          make -C build/CnC/march_cu CFLAGS="-O3 -fno-strict-aliasing -Wall -DNDEBUG -fcommon" > /dev/null
+      - name: Cube and conquer
+        run: |
+          . data/stabcube.env
+          line=$(sed -n "$(( ${{ matrix.part }} + 1 ))p" "$QUEUE")
+          echo "$line"
+          ulimit -s unlimited
+          timeout 335m scripts/stabcube.sh "$line" "$FLAGS" "$DEPTH" "$CUBE_TIMEOUT" "$BUDGET" "$(nproc)" || true
+      - name: Keep the result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stabcube-${{ matrix.part }}
+          path: |
+            out/result.txt
+            out/cubes.txt
+            out/open.txt
+            out/march0.txt
+            out/SAT_*.txt
+            out/m.cnf.map
+            out/res_*.txt
+            out/queue.txt
