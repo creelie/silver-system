@@ -40,6 +40,9 @@ jobs:
           pip install -q python-sat networkx
           git clone -q https://github.com/marijnheule/CnC.git build/CnC
           git -C build/CnC checkout -q 705b60c6491ef2b61988b3ce6ac674be1b90571d
+          # march_cu keeps pointers into its clause database across a realloc once the formula passes
+          # 10M integers; start with room for 300M so the database is never moved
+          sed -i "s/S->mem_max     = 10000000;/S->mem_max     = 300000000;/" build/CnC/march_cu/microsat.c
           make -C build/CnC/march_cu CFLAGS="-O3 -fno-strict-aliasing -Wall -DNDEBUG -fcommon" > /dev/null
       - name: Cube and conquer
         run: |

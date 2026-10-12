@@ -13,7 +13,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 K="$ROOT/build/tools/kissat/build/kissat"; M="$ROOT/build/CnC/march_cu/march_cu"
 O="$ROOT/out"; mkdir -p "$O"; T0=$(date +%s)
 python3 "$ROOT/scripts/stab2.py" "$n" "$p" "$sz" "$O/m.cnf" "$dm" - "$FL"
-"$M" "$O/m.cnf" -d "$D" -o "$O/q.icnf" > "$O/march0.log" 2>&1
+"$M" "$O/m.cnf" -d "$D" -o "$O/q.icnf" > "$O/march0.log" 2>&1; mrc=$?
+if grep -q 'UNSATISFIABLE' "$O/march0.log"; then
+  echo "$1 UNSAT (march_cu at the root) $(( $(date +%s) - T0 ))s" | tee "$O/result.txt"; exit 0
+fi
+if [ "$mrc" != 0 ] || ! grep -q '^a' "$O/q.icnf" 2>/dev/null; then
+  echo "$1 ERROR march_cu exit $mrc" | tee "$O/result.txt"; tail -5 "$O/march0.log"; exit 1
+fi
 grep '^a' "$O/q.icnf" | sed 's/^a //; s/ 0$//' > "$O/queue.txt"
 grep -o 'number of cubes [0-9]*, including [0-9]* refuted leaves' "$O/march0.log" | tee "$O/march0.txt"
 : > "$O/cubes.txt"
@@ -47,16 +53,19 @@ while [ -s "$O/queue.txt" ]; do
     else echo "$cube" >> "$O/stuck.txt"; fi
     rm -f "$O/sub.icnf"
   done < "$O/open.txt"
+  : > "$O/open.txt"   # every open cube is now split (children queued), closed by march_cu, or stuck
   round=$(( round + 1 ))
 done
 total=$(grep -c . "$O/cubes.txt")
+touch "$O/open.txt" "$O/stuck.txt"; cat "$O/stuck.txt" >> "$O/open.txt"
 if [ -f "$O/SAT_model.txt" ]; then
   echo "$1 SAT (cube $(cat "$O/SAT_cube.txt"))" | tee "$O/result.txt"
   python3 "$ROOT/scripts/stab_decode.py" "$O/SAT_model.txt" "$O/m.cnf.map" | tee -a "$O/result.txt"
-elif [ -s "$O/open.txt" ] || [ -s "$O/stuck.txt" ]; then
-  cat "$O/stuck.txt" >> "$O/open.txt" 2>/dev/null
-  echo "$1 OPEN $(sort -u "$O/open.txt" | grep -c .) of $total cubes $(( $(date +%s) - T0 ))s" | tee "$O/result.txt"
-else
+elif [ -s "$O/open.txt" ] || [ -s "$O/queue.txt" ]; then
+  echo "$1 OPEN $(sort -u "$O/open.txt" | grep -c .) open, $(grep -c . "$O/queue.txt") queued, $total cubes tried $(( $(date +%s) - T0 ))s" | tee "$O/result.txt"
+elif [ "$total" -gt 0 ]; then
   echo "$1 UNSAT $total cubes $(cat "$O/march0.txt") $(( $(date +%s) - T0 ))s" | tee "$O/result.txt"
+else
+  echo "$1 ERROR (no verdict)" | tee "$O/result.txt"
 fi
 rm -f "$O/m.cnf" "$O"/sol_*.txt
