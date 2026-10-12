@@ -72,8 +72,8 @@ for l in range(2):
 # independence number <= p
 for S in itertools.combinations(range(n), p + 1):
     cls.append([E(a, b) for a, b in itertools.combinations(S, 2)])
-# no 9-clique inside a part
-for Q in P:
+# no 9-clique inside a part (flag k: leave these clauses out)
+for Q in (P if 'k' not in EXTRA else []):
     if len(Q) >= 9:
         for S in itertools.combinations(Q, 9):
             cls.append([-E(a, b) for a, b in itertools.combinations(S, 2)])

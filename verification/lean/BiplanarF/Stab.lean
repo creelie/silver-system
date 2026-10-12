@@ -12,7 +12,8 @@ and whose complement `H` is split into the parts `P₀, P₁, …` (consecutive 
 by a partition that minimises the number of edges of `H` inside the parts. It is the formula written by
 `scripts/stab2.py n p sizes out dmin - flags`, clause for clause and variable for variable (the
 cardinality constraints are PySAT's sequential counter and totalizers), with the redundant
-constraints named by `flags` (letters `a b d e p r`, and `n` to leave out the symmetry breaking).
+constraints named by `flags` (letters `a b d e p r`, `n` to leave out the symmetry breaking and `k` to
+leave out the clauses of item 5 on 9 vertices of a part).
 
 Literals are written as signed DIMACS numbers (`Int`, variables counted from 1) and stored as
 `cubeLit x = (|x| - 1, x > 0)`, so `Std.Sat.CNF.dimacs` prints them back unchanged. With `N = n(n-1)/2`
@@ -252,7 +253,7 @@ def encodeSt (n p : Nat) (sizes : List Nat) (dmin : Nat) (flags : String) : St :
     for S in choose (p + 1) V do
       emit ((pairsOf S).map fun (a, b) => E a b)
     for Q in P do
-      if Q.size ≥ 9 then
+      if Q.size ≥ 9 && !has 'k' then
         for S in choose 9 Q.toList do
           emit ((pairsOf S).map fun (a, b) => -E a b)
     -- 6. Füredi's bound: a non-edge inside a part counts twice (each count is a copy variable)

@@ -3,7 +3,8 @@
 #   Refute one Turán-stability model by cube and conquer and check the refutation in Lean.
 #   1. the Lean encoder (verification/lean, Stab.encode) writes the formula F, the same file as
 #      scripts/stab2.py n p sizes F dmin - FLAGS;
-#   2. march_cu splits F into cubes DEPTH levels deep (the cubes include its refuted leaves), or the
+#   2. march_cu splits F into cubes DEPTH levels deep (the cubes include its refuted leaves; DEPTH 0:
+#      the two cubes x1 and -x1), or the
 #      cubes are read from the file CUBES (one per line, for instance the refuted cubes of a run of
 #      scripts/stabcube.sh; nothing is assumed about them, since step 4 checks that they cover);
 #   3. CaDiCaL refutes F plus each cube's literals as unit clauses and writes an LRAT proof, which
@@ -36,6 +37,8 @@ withunits() { awk -v k="$(wc -w <<< "$1")" 'NR == 1 { $4 += k } { print }' "$O/m
 if [ -n "$CUBES" ]; then
   grep -v '^ *$' "$CUBES" > "$O/queue.txt"
   [ -s "$O/queue.txt" ] || { echo "$1 ERROR no cubes in $CUBES" | tee "$O/result.txt"; exit 1; }
+elif [ "$D" = 0 ]; then
+  printf '1\n-1\n' > "$O/queue.txt"   # DEPTH 0: no cubing (two cubes, so that the cover is not empty)
 else
   "$M" "$O/m.cnf" -d "$D" -o "$O/q.icnf" > "$O/march0.log" 2>&1; mrc=$?
   if grep -q 'UNSATISFIABLE' "$O/march0.log"; then

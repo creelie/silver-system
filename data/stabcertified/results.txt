@@ -1,0 +1,1 @@
+28 3 1,12,15 9 CERTIFIED T28_3_1_12_15_d9_abdepr cubes=62 clauses=1357769 solve=70s lean=95s lrat_mb=590 sha256=d3a85c32d4fe622c6b055482d30b6d0dfbc5255bd10c32fcaf2d180200210ed2
