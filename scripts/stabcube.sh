@@ -20,7 +20,7 @@ fi
 if [ "$mrc" != 0 ] || ! grep -q '^a' "$O/q.icnf" 2>/dev/null; then
   echo "$1 ERROR march_cu exit $mrc" | tee "$O/result.txt"; tail -5 "$O/march0.log"; exit 1
 fi
-grep '^a' "$O/q.icnf" | sed 's/^a //; s/ 0$//' > "$O/queue.txt"
+grep '^a' "$O/q.icnf" | sed -E 's/^a//; s/(^| )0$//; s/^ //' > "$O/queue.txt"
 grep -o 'number of cubes [0-9]*, including [0-9]* refuted leaves' "$O/march0.log" | tee "$O/march0.txt"
 : > "$O/cubes.txt"
 solve() {  # solve WORKER QUEUEFILE
@@ -49,9 +49,10 @@ while [ -s "$O/queue.txt" ]; do
     # march_cu reads only as many clauses as the header declares, so the header must count the units
     "$M" <(awk -v k="$(wc -w <<< "$cube")" 'NR == 1 { $4 += k } { print }' "$O/m.cnf"; for l in $cube; do echo "$l 0"; done) \
       -d 6 -o "$O/sub.icnf" > "$O/sub.log" 2>&1 || true
-    if grep -q '^a' "$O/sub.icnf" 2>/dev/null; then
-      grep '^a' "$O/sub.icnf" | sed 's/^a //; s/ 0$//' | sed "s/^/$cube /" >> "$O/queue.txt"
-    elif grep -q 'UNSATISFIABLE' "$O/sub.log"; then echo "$round 20 0 $cube (march)" >> "$O/cubes.txt"
+    if grep -q '^a [^0]' "$O/sub.icnf" 2>/dev/null; then
+      grep '^a' "$O/sub.icnf" | sed -E 's/^a//; s/(^| )0$//; s/^ //' | sed "s/^/$cube /" >> "$O/queue.txt"
+    elif grep -q 'UNSATISFIABLE' "$O/sub.log" || grep -q '^a 0' "$O/sub.icnf" 2>/dev/null; then
+      echo "$round 20 0 $cube (march)" >> "$O/cubes.txt"
     else echo "$cube" >> "$O/stuck.txt"; fi
     rm -f "$O/sub.icnf"
   done < "$O/open.txt"

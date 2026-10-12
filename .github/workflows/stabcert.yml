@@ -1,0 +1,76 @@
+name: stabcert
+
+# Lean-checked refutations of the Turán-stability models (scripts/stabcert.sh): the Lean encoder
+# Stab.encode writes the formula, march_cu cubes it, CaDiCaL and lrat-trim refute each cube with an
+# LRAT proof, the negated cubes are refuted too (the cubes cover every assignment), and Lean checks
+# every certificate and proves (Stab.encode n p sizes dmin flags).Unsat. A push that changes
+# data/stabcert.env starts a run on the queue written there, one "n p s1,..,sp dmin [cubes]" per job;
+# the optional file of cubes (for instance the refuted cubes of a stabcube run) replaces march_cu.
+
+on:
+  push:
+    paths: ["data/stabcert.env"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      parts: ${{ steps.p.outputs.parts }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: p
+        run: |
+          . data/stabcert.env
+          echo "parts=$(seq -s, 0 $(( $(grep -c . "$QUEUE") - 1 )) | sed 's/^/[/; s/$/]/')" >> "$GITHUB_OUTPUT"
+  cert:
+    needs: plan
+    name: Line ${{ matrix.part }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJSON(needs.plan.outputs.parts) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space for the proofs
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build CaDiCaL, lrat-trim, march_cu and the Lean encoder
+        run: |
+          scripts/get_tools.sh
+          git clone -q https://github.com/marijnheule/CnC.git build/CnC
+          git -C build/CnC checkout -q 705b60c6491ef2b61988b3ce6ac674be1b90571d
+          sed -i "s/S->mem_max     = 10000000;/S->mem_max     = 300000000;/" build/CnC/march_cu/microsat.c
+          make -C build/CnC/march_cu CFLAGS="-O3 -fno-strict-aliasing -Wall -DNDEBUG -fcommon" > /dev/null
+          cd verification/lean && lake build > /dev/null && lake build stab-dump > /dev/null
+      - name: Refute and check in Lean
+        run: |
+          . data/stabcert.env
+          read -r n p s d cubes <<< "$(sed -n "$(( ${{ matrix.part }} + 1 ))p" "$QUEUE")"
+          echo "$n $p $s $d ${cubes:-}"
+          ulimit -s unlimited
+          export CHUNK_MB
+          timeout 340m scripts/stabcert.sh "$n $p $s $d" "$FLAGS" "$DEPTH" "$CUBE_TIMEOUT" "$BUDGET" "$(nproc)" ${cubes:+"$cubes"} || true
+          mkdir -p out
+          d=$(ls -d build/stabcert/*/ | head -n 1)
+          cp "$d"/result.txt "$d"/cubes.txt "$d"/leaves.txt "$d"/lean.txt out/ 2>/dev/null || true
+          cp -r verification/lean/StabCert out/lean 2>/dev/null || true
+          find out/lean -type l -delete 2>/dev/null || true
+          cat out/result.txt || true
+      - name: Keep the theorems and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stabcert-${{ matrix.part }}
+          path: out/
