@@ -2,8 +2,11 @@ name: blowups
 
 # Tests clique blow-ups F[w] on 18 vertices with independence number 2 for biplanarity
 # (Gethner–Sulanke, Open Problem 2). Each of the 16 jobs takes every 16th line of the queue.
+# A push that changes data/run.env starts a run on the queue and time limit written there.
 
 on:
+  push:
+    paths: ["data/run.env"]
   workflow_dispatch:
 
 permissions:
@@ -29,7 +32,10 @@ jobs:
       - name: Build Kissat
         run: scripts/get_tools.sh
       - name: Test the shard
-        run: timeout 20400 scripts/shard.sh data/queue1.txt ${{ matrix.shard }} 16 1800 4 || true
+        run: |
+          QUEUE=data/queue1.txt; TIMEOUT=1800
+          [ -f data/run.env ] && . data/run.env
+          timeout 20400 scripts/shard.sh "$QUEUE" ${{ matrix.shard }} 16 "$TIMEOUT" 4 || true
       - name: Decode drawings that were found
         if: always()
         run: |
