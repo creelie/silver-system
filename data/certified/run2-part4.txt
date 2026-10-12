@@ -1,0 +1,2 @@
+2_4_4_3_5_2_6_26c21edb 2,4,4,3,5,2,6|0-1,1-2,2-3,3-4,4-5,5-6,0-6 certified clauses=2210727 solve=780.5s trim=1.8s lean=20.2s lrat_sha256=a7c76092a85c99eef96261e999e758abe9ccf2c1b3c9be4444bb1b4d59ca4a92
+2_4_4_4_4_3_5_26c21edb 2,4,4,4,4,3,5|0-1,1-2,2-3,3-4,4-5,5-6,0-6 certified clauses=2189777 solve=1370.2s trim=3.3s lean=25.4s lrat_sha256=37dc5ff62cdd08507b1be1adc025f8bedc6e6d82683c275a26d232031262e97e
