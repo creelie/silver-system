@@ -142,6 +142,18 @@ def reach (I : Inst) (l : Nat) (S : Array Nat) : M (Array (Array Lit)) := do
     R := R2
   return R
 
+/-- The nonempty sets of pairwise adjacent bags among `xs` (increasing) together with the bags `pre`
+already chosen, of total size at most 8 counting `s` vertices already chosen (fuel bounds the depth). -/
+def cliquesAux (I : Inst) : Nat → Nat → List Nat → List (List Nat)
+  | 0, _, _ => []
+  | _ + 1, _, [] => []
+  | f + 1, s, x :: xs =>
+    let s' := s + I.parts[x]!.size
+    let withX := if s' ≤ 8 then
+        [x] :: (cliquesAux I f s' (xs.filter fun y => I.fadj[x]![y]!)).map (x :: ·)
+      else []
+    withX ++ cliquesAux I f s xs
+
 def encode (w : List Nat) (fe : List (Nat × Nat)) : CNF Nat := Id.run do
   let I := mkInst w fe
   let n := I.n
@@ -196,12 +208,12 @@ def encode (w : List Nat) (fe : List (Nat × Nat)) : CNF Nat := Id.run do
           for l in [0:2] do atMost ((pairsOf S).map fun (a, b) => lay I l a b) (3 * sz - 6)
     for l in [0:2] do
       atMost (E.toList.map fun (a, b) => lay I l a b) (3 * n - 6)
-    -- 5. K₉ certificates
-    for msk in [1:2 ^ I.k] do
-      let bs := (List.range I.k).filter fun i => msk.testBit i
-      let isCl := bs.all fun i => bs.all fun j => i == j || I.fadj[i]![j]!
+    -- 5. K₉ certificates, for the 8-cliques that are unions of pairwise adjacent bags (in increasing
+    --    order of the bit mask of their bags)
+    let cls := (cliquesAux I (I.k + 1) 0 (List.range I.k)).map fun bs => (bs.foldl (fun m i => m + 2 ^ i) 0, bs)
+    for (_, bs) in cls.toArray.qsort (fun a b => a.1 < b.1) do
       let Q := bs.foldl (fun acc i => acc ++ I.parts[i]!) #[]
-      if isCl && Q.size == 8 then
+      if Q.size == 8 then
         let W := (Array.range n).filter fun x => !(Q.contains x)
         let X : Array (Option Nat) := (W.map some).push none
         -- att[l][xi][q], free[l][xi][u], cq[l][u][q2]  (xi, q, u, q2 are positions)
