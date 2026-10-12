@@ -12,3 +12,4 @@
 28 3 1,9,18 9 CERTIFIED T28_3_1_9_18_d9_abdeprk cubes=2 clauses=1433586 solve=250s lean=40s lrat_mb=55 sha256=e336d325f6ec4025037b1398a4155cc60c7f4de6a5df8fafa32f951bba561668
 28 3 1,10,17 9 CERTIFIED T28_3_1_10_17_d9_abdeprk cubes=2 clauses=1398524 solve=235s lean=27s lrat_mb=37 sha256=a9ed5dfa81764c3d922ee5f042fb77d65e600a9b3824ed45b105633bd959927f
 28 3 1,13,14 9 CERTIFIED T28_3_1_13_14_d9_abdepr cubes=2 clauses=1345779 solve=84s lean=27s lrat_mb=19 sha256=87794c92d6a39e00db76379183fc4188a2a7cf005f7673518dbf7a741144365a
+28 3 2,11,15 9 CERTIFIED T28_3_2_11_15_d9_abdepr cubes=38 clauses=1308396 solve=784s lean=58s lrat_mb=376 sha256=f32bab6e1662168a9fd64d792a8860d6d970676bf380808a856f011249505bc8
