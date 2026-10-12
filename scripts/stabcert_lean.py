@@ -27,7 +27,7 @@ with open(os.path.join(d, 'Cubes.lean'), 'w') as f:
     f.write(HDR + 'public import BiplanarF.Stab\n\n@[expose] public section\n\nnamespace StabCert.' + ns + '\n\n')
     for k, ch in enumerate(chunks):
         f.write(f'/-- Cubes {ch[0][0]}–{ch[-1][0]}. -/\n')
-        f.write(f'def cubes{k} : List (List Int) := [\n  ' + ',\n  '.join('[' + ', '.join(map(str, c)) + ']' for _, c in ch) + ']\n\n')
+        f.write(f'def cubes{k} : List (List Int) := [\n  ' + ',\n  '.join('([' + ', '.join(map(str, c)) + '] : List Int)' for _, c in ch) + ']\n\n')
     f.write('end StabCert.' + ns + '\n\nend\n')
 for k, ch in enumerate(chunks):
     with open(os.path.join(d, f'C{k}.lean'), 'w') as f:

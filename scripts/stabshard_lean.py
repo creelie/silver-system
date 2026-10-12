@@ -20,7 +20,7 @@ HDR = 'module\n\n'
 with open(os.path.join(d, f'K{j}.lean'), 'w') as f:
     f.write(HDR + 'public import BiplanarF.Stab\n\n@[expose] public section\n\nnamespace ' + mod + '\n\n')
     f.write(f'/-- Cubes {cubes[0][0]}–{cubes[-1][0]}. -/\n')
-    f.write(f'def cubes{j} : List (List Int) := [\n  ' + ',\n  '.join('[' + ', '.join(map(str, c)) + ']' for _, c in cubes) + ']\n\n')
+    f.write(f'def cubes{j} : List (List Int) := [\n  ' + ',\n  '.join('([' + ', '.join(map(str, c)) + '] : List Int)' for _, c in cubes) + ']\n\n')
     f.write('end ' + mod + '\n\nend\n')
 with open(os.path.join(d, f'C{j}.lean'), 'w') as f:
     f.write(HDR + ''.join(f'public import {m}\npublic meta import {m}\n' for m in ['BiplanarF.Stab', f'{mod}.K{j}']))
