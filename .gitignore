@@ -1,0 +1,4 @@
+build/
+out/
+verification/lean/.lake/
+verification/lean/Certs/

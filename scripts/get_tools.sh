@@ -18,3 +18,10 @@ if [ ! -d "$T/cadical" ]; then
 fi
 (cd "$T/cadical" && [ -x build/cadical ] || { ./configure > /dev/null && make -j"$(nproc)" > /dev/null; })
 "$T/cadical/build/cadical" --version
+#   lrat-trim 0.2.0 https://github.com/arminbiere/lrat-trim commit b30f400f4ee5c32b77ee566a7c006081b521534f
+if [ ! -d "$T/lrat-trim" ]; then
+  git clone -q https://github.com/arminbiere/lrat-trim.git "$T/lrat-trim"
+  git -C "$T/lrat-trim" checkout -q b30f400f4ee5c32b77ee566a7c006081b521534f
+fi
+(cd "$T/lrat-trim" && [ -x lrat-trim ] || { ./configure > /dev/null && make > /dev/null; })
+"$T/lrat-trim/lrat-trim" --version

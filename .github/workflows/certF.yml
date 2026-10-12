@@ -1,0 +1,73 @@
+name: certF
+
+# Lean-checked refutations of "the clique blow-up F[w] is biplanar" (scripts/certifyF.sh): CaDiCaL writes an
+# LRAT proof, lrat-trim checks and trims it, and Lean checks it against Biplanar.encode w edges
+# (verification/lean). A push that changes data/cert.env starts a run on the queue written there
+# (QUEUE, one "w|edges" per line; JOBS jobs, PAR lines at a time per job, TIMEOUT seconds per line).
+
+on:
+  push:
+    paths: ["data/cert.env"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      parts: ${{ steps.p.outputs.parts }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: p
+        run: |
+          JOBS=8; . data/cert.env
+          echo "parts=$(seq -s, 0 $(( JOBS - 1 )) | sed 's/^/[/; s/$/]/')" >> "$GITHUB_OUTPUT"
+  cert:
+    needs: plan
+    name: Part ${{ matrix.part }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJSON(needs.plan.outputs.parts) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space for the proofs
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build CaDiCaL 3.0.1, lrat-trim and the Lean encoder
+        run: |
+          scripts/get_tools.sh
+          cd verification/lean && lake build > /dev/null && lake build biplanarf-dump > /dev/null
+      - name: Refute and check in Lean
+        run: |
+          JOBS=8; PAR=2; TIMEOUT=19000; . data/cert.env
+          mkdir -p out
+          awk -v s="${{ matrix.part }}" -v n="$JOBS" '(NR - 1) % n == s' "$QUEUE" > out/mine.txt
+          one() {
+            if out=$(timeout "$TIMEOUT" scripts/certifyF.sh "$1" 2>&1); then echo "$out" | tail -n 1 >> out/certified.txt
+            else echo "$1 FAILED $(echo "$out" | tail -n 1)" >> out/failed.txt; fi
+          }
+          export -f one; export TIMEOUT
+          xargs -P "$PAR" -d '\n' -I{} bash -c 'one "$1"' _ {} < out/mine.txt || true
+          touch out/certified.txt out/failed.txt
+          echo "certified $(grep -c . out/certified.txt), failed $(grep -c . out/failed.txt)"
+          cp verification/lean/Certs/*.lean out/ 2>/dev/null || true
+          for f in build/lrat/*.lrat; do [ -e "$f" ] && xz -T0 -6 "$f"; done
+          mkdir -p out/lrat && mv build/lrat/*.xz out/lrat/ 2>/dev/null || true
+          if grep -q . out/failed.txt; then cat out/failed.txt; fi
+      - name: Keep the theorems, proofs and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cert-${{ matrix.part }}
+          path: out/
