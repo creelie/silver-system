@@ -1,0 +1,2 @@
+2_4_5_5_3_2_2_1_0daa599f 2,4,5,5,3,2,2,1|0-3,0-4,0-5,0-7,1-4,1-6,1-7,2-5,2-6,2-7,3-6,3-7,4-5,4-7,5-7,6-7 certified clauses=2275532 solve=31.5s trim=0.4s lean=9.6s lrat_sha256=cb764dc51d13a19fa8b3ddb449c317fd3093b339541191f4a71866347f60edb9
+2_3_5_2_6_2_6_26c21edb 2,3,5,2,6,2,6|0-1,1-2,2-3,3-4,4-5,5-6,0-6 certified clauses=2665772 solve=230.6s trim=0.7s lean=15.8s lrat_sha256=6cc28199d09ac53eba1de7ad12cd1b12c69198b8bba2e3cf8e5bc5c649191e69
