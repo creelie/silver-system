@@ -1,0 +1,58 @@
+name: smssurvey
+
+# SAT modulo symmetries on the open Turán-stability cases of Open Problem 1(b), with the thickness-two propagator
+# and the small-obstruction propagator (scripts/sms/uc.patch). A push that changes data/smssurvey.env starts a run:
+# one job per line "s1,s2,s3" of the queue file, each a four-variant portfolio on the job's four cores
+# (scripts/smssurvey.sh). This is a survey: an UNSAT answer here is not yet a checked proof.
+
+on:
+  push:
+    paths: ["data/smssurvey.env"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      cases: ${{ steps.p.outputs.cases }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: p
+        run: |
+          . data/smssurvey.env
+          echo "cases=$(awk 'NF { printf "%s\"%s\"", (c++ ? "," : "["), $1 } END { print "]" }' "$QUEUE")" >> "$GITHUB_OUTPUT"
+  case:
+    needs: plan
+    name: Case ${{ matrix.c }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      matrix:
+        c: ${{ fromJSON(needs.plan.outputs.cases) }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build SMS
+        run: |
+          sudo apt-get install -y -q libboost-program-options-dev libboost-graph-dev > /dev/null
+          pip install -q python-sat
+          scripts/sms/build_sms.sh build/sms
+      - name: Run the portfolio
+        run: |
+          . data/smssurvey.env
+          scripts/smssurvey.sh "${{ matrix.c }}" "$TIMEOUT"
+      - name: Upload
+        if: always()
+        run: |
+          c="${{ matrix.c }}"; echo "TAG=${c//,/_}" >> "$GITHUB_ENV"
+          rm -f work/*.enc
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smssurvey-${{ env.TAG }}
+          path: |
+            results/
+            work/
